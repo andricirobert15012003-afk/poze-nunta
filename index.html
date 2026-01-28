@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Poze & Video – Nuntă</title>
+
+  <style>
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      max-width: 900px;
+      margin: 24px auto;
+      padding: 0 16px;
+      background: #fafafa;
+    }
+    h1 { text-align: center; }
+    .box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.06);
+    }
+    button {
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: none;
+      background: #111;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    input[type=file] {
+      width: 100%;
+      margin: 12px 0;
+    }
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .grid img, .grid video {
+      width: 100%;
+      border-radius: 10px;
+      background: #eee;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>📸 Poze & Video – Nunta noastră</h1>
+<p class="muted" style="text-align:center">
+  Încarcă poze sau video de la nuntă ❤️<br>
+  Mulțumim că ne ajuți să strângem amintirile!
+</p>
+
+<div class="box">
+  <h2>1️⃣ Încarcă fișiere</h2>
+  <input id="files" type="file" multiple accept="image/*,video/*">
+  <button id="uploadBtn">Încarcă</button>
+  <p id="status" class="muted"></p>
+</div>
+
+<div class="box">
+  <h2>2️⃣ Galerie</h2>
+  <button id="refreshBtn">Reîncarcă galeria</button>
+  <p class="muted">Dacă tocmai ai urcat poze, apasă reîncarcă.</p>
+  <div id="gallery" class="grid"></div>
+</div>
+
+<script>
+  const CLOUD_NAME = "dbkazxthm";
+  const UPLOAD_PRESET = "wedding_unsigned";
+  const FOLDER = "poze-nunta";
+
+  const statusEl = document.getElementById("status");
+  const galleryEl = document.getElementById("gallery");
+
+  async function uploadOne(file) {
+    if (file.size > 50 * 1024 * 1024) {
+      throw new Error("Fișier prea mare (max 50MB)");
+    }
+
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("upload_preset", UPLOAD_PRESET);
+    fd.append("folder", FOLDER);
+
+    const res = await fetch(url, { method: "POST", body: fd });
+    if (!res.ok) throw new Error("Upload eșuat");
+    return await res.json();
+  }
+
+  document.getElementById("uploadBtn").addEventListener("click", async () => {
+    const files = document.getElementById("files").files;
+    if (!files.length) return;
+
+    statusEl.textContent = "Se încarcă...";
+    try {
+      let ok = 0;
+      for (const f of files) {
+        await uploadOne(f);
+        ok++;
+        statusEl.textContent = `Încărcat ${ok}/${files.length}`;
+      }
+      statusEl.textContent = "Gata ✅ Apasă «Reîncarcă galeria»";
+    } catch (e) {
+      statusEl.textContent = e.message || "Eroare la upload";
+    }
+  });
+
+  async function loadGallery() {
+    galleryEl.innerHTML = "";
+    const res = await fetch("/.netlify/functions/list-media");
+    if (!res.ok) {
+      galleryEl.innerHTML = "<p class='muted'>Galeria nu poate fi încărcată.</p>";
+      return;
+    }
+    const items = await res.json();
+    for (const it of items) {
+      if (it.resource_type === "video") {
+        const v = document.createElement("video");
+        v.src = it.url;
+        v.controls = true;
+        v.playsInline = true;
+        galleryEl.appendChild(v);
+      } else {
+        const img = document.createElement("img");
+        img.src = it.url;
+        img.loading = "lazy";
+        galleryEl.appendChild(img);
+      }
+    }
+  }
+
+  document.getElementById("refreshBtn").addEventListener("click", loadGallery);
+  loadGallery();
+</script>
+
+</body>
+</html>
