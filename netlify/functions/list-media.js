@@ -13,13 +13,12 @@ exports.handler = async () => {
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
-    const folder = "poze-nunta";
 
     const timestamp = Math.floor(Date.now() / 1000);
+
     const params = {
-      expression: `folder:${folder}/*`,
       sort_by: "created_at",
-      max_results: 100,
+      max_results: 50,
       timestamp
     };
 
@@ -32,14 +31,15 @@ exports.handler = async () => {
     });
 
     const resp = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/resources/search`,
+      `https://api.cloudinary.com/v1_1/${cloudName}/resources/image`,
       { method: "POST", body }
     );
 
     const data = await resp.json();
+
     const items = (data.resources || []).map(r => ({
       url: r.secure_url,
-      resource_type: r.resource_type
+      resource_type: "image"
     }));
 
     return {
@@ -47,7 +47,10 @@ exports.handler = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(items)
     };
-  } catch {
-    return { statusCode: 500, body: "Server error" };
+  } catch (e) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Server error", details: e.message })
+    };
   }
 };
