@@ -1,11 +1,14 @@
 const crypto = require("crypto");
 
 function sign(params, secret) {
-  const sorted = Object.keys(params)
+  const toSign = Object.keys(params)
     .sort()
     .map(k => `${k}=${params[k]}`)
     .join("&");
-  return crypto.createHash("sha1").update(sorted + secret).digest("hex");
+  return crypto
+    .createHash("sha1")
+    .update(toSign + secret)
+    .digest("hex");
 }
 
 exports.handler = async () => {
@@ -16,7 +19,9 @@ exports.handler = async () => {
 
     const timestamp = Math.floor(Date.now() / 1000);
 
+    // 🔍 Căutăm TOATE imaginile, indiferent de folder
     const params = {
+      expression: "resource_type:image",
       sort_by: "created_at",
       max_results: 50,
       timestamp
@@ -30,16 +35,20 @@ exports.handler = async () => {
       signature
     });
 
-    const resp = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/resources/image`,
-      { method: "POST", body }
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/resources/search`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body
+      }
     );
 
-    const data = await resp.json();
+    const data = await response.json();
 
     const items = (data.resources || []).map(r => ({
       url: r.secure_url,
-      resource_type: "image"
+      resource_type: r.resource_type
     }));
 
     return {
@@ -47,10 +56,13 @@ exports.handler = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(items)
     };
-  } catch (e) {
+  } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Server error", details: e.message })
+      body: JSON.stringify({
+        error: "Server error",
+        details: err.message
+      })
     };
   }
 };
